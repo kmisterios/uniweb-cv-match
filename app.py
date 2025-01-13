@@ -1,46 +1,7 @@
-import os
-from collections import OrderedDict
-
 import pandas as pd
 import streamlit as st
-import yaml
-from dotenv import load_dotenv
 
-from model.model import CvSelector
-
-load_dotenv()
-
-
-def df2dict(df: pd.DataFrame):
-    res = OrderedDict()
-    for i in range(df.shape[0]):
-        row = df.iloc[i]
-        res[row["ID"]] = row.to_dict()
-    return res
-
-
-def select_color(match_score: int):
-    if match_score >= 70:
-        return "green"
-    elif 40 < match_score < 70:
-        return "orange"
-    else:
-        return "red"
-
-
-@st.cache_data
-def load_data(path: str):
-    return pd.read_csv(path)
-
-
-@st.cache_resource
-def load_model(config_path: str):
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    config_model = config["model"]
-    selector = CvSelector(config=config_model, api_token=os.getenv("OPENAI_TOKEN"))
-    return selector
-
+from utils.utils import *
 
 if "computed" not in st.session_state:
     st.session_state["computed"] = False
@@ -118,9 +79,11 @@ if option is not None:
                         col1_container_cv.markdown(
                             f":{accent_color}[{match_score}% match]"
                         )
-                        col1_container_cv.markdown(
-                            f"**{data_cv[key]['Профессиональная область']}**"
+                        formated_text = format_intersection(
+                            vacancy["Профессиональная область"],
+                            data_cv[key]["Профессиональная область"],
                         )
+                        col1_container_cv.markdown(formated_text)
                     with col2_cv:
                         col2_container_cv = st.container(border=True, height=150)
                         col2_container_cv.caption("Список навыков")
@@ -129,9 +92,11 @@ if option is not None:
                         col2_container_cv.markdown(
                             f":{accent_color}[{match_score}% match]"
                         )
-                        col2_container_cv.markdown(
-                            f"**{data_cv[key]['Список навыков']}**"
+                        formated_text = format_intersection(
+                            vacancy["Список навыков"], data_cv[key]["Список навыков"]
                         )
+                        col2_container_cv.markdown(formated_text)
+
                     container0 = st.container(border=True)
                     container0.caption("Зарплатные ожидания")
                     container0.write(data_cv[key]["Зарплатные ожидания"])

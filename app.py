@@ -87,7 +87,6 @@ if option is not None:
             df_ranked_2nd = selector.rank_second_stage(
                 vacancy=vacancy, df_relevant=df_ranked_1st.copy()
             )
-            df_ranked_2nd.to_csv("./test.csv")
             data_cv = df2dict(df_ranked_2nd)
             st.session_state["computed"] = True
         if st.session_state["computed"]:

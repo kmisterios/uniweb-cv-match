@@ -9,10 +9,19 @@ if "computed" not in st.session_state:
 
 st.title("Подбор кандидатов 💼")
 
+method = st.select_slider(
+    "Выберите метод",
+    options=[
+        "Метод 1",
+        "Метод 2",
+    ],
+)
+
 vacancy_df = load_data(path="./data/vacancies.csv")
-selector = load_model(config_path="./config/config.yaml")
+selector = load_model(config_path="./config/config.yaml", method=method)
 
 vacancies = vacancy_df["Должность"].to_list()
+
 
 option = st.selectbox(
     "Вакансии",

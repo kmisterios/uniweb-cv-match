@@ -34,11 +34,13 @@ def load_data(path: str):
 
 
 @st.cache_resource
-def load_model(config_path: str):
+def load_model(config_path: st, method: str):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     config_model = config["model"]
-    selector = CvSelector(config=config_model, api_token=os.getenv("OPENAI_TOKEN"))
+    selector = CvSelector(
+        config=config_model, api_token=os.getenv("OPENAI_TOKEN"), method=method
+    )
     return selector
 
 

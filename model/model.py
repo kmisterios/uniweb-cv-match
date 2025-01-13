@@ -11,13 +11,15 @@ from loguru import logger
 from openai import OpenAI
 from sklearn.metrics.pairwise import cosine_similarity
 
+from utils.enums import Method
+
 from .request_api import OpenAIEmbedder, process_corpus
 
 load_dotenv()
 
 
 class CvSelector:
-    def __init__(self, config: Dict, api_token: str):
+    def __init__(self, config: Dict, api_token: str, method: str):
         ## stage 1 config
         self.text_features = config["stage_1"]["text_features"]
         self.cluster_match_features = config["stage_1"]["cluster_match_features"]
@@ -33,10 +35,17 @@ class CvSelector:
         self.keys_cv = config["stage_2"]["keys_cv"]
         self.second_stage_weights = np.array(config["stage_2"]["weights"])
         self.top_n_second_stage = config["stage_2"]["top_n"]
+
         self.embedder = OpenAIEmbedder(
             api_key=api_token, model_name=config["stage_2"]["model_name_embed"]
         )
         self.api_token = api_token
+        self.method = method
+        if method not in [Method.EMBEDDINGS, Method.PROMPT]:
+            self.method = str(Method.EMBEDDINGS)
+        if self.method == Method.PROMPT:
+            self.prompt_matching = config["stage_2"]["prompt_matching"]
+            self.system_prompt_matching = config["stage_2"]["system_prompt_matching"]
 
     def __text_features_intersection(self, str_feats_ref: str, str_feats_match: str):
         set1 = set(str_feats_ref.lower().split(", "))
@@ -91,6 +100,26 @@ class CvSelector:
         )
         return completion.choices[0].message.content
 
+    def match_prompt(self, data: str):
+        client = OpenAI(api_key=self.api_token)
+        vac_desc, cv_desc = data.split("[SEP]")
+        prompt = self.prompt_matching + f"\n{cv_desc}"
+        system_prompt = self.system_prompt_matching + f"\n{vac_desc}"
+        completion = client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+        )
+        result = completion.choices[0].message.content
+        try:
+            score = json.loads(result)["match_score"]
+        except JSONDecodeError:
+            score = 0.5
+        return score
+
     def rank_first_stage(self, vacancy: Dict, df_relevant: pd.DataFrame):
         ranking_features = self.cluster_match_features.copy()
         for feat in self.text_features:
@@ -142,14 +171,35 @@ class CvSelector:
             desc = self.__get_desc(cv_dict, keys=self.keys_cv)
             descs.append(desc)
         df_relevant["Full_description"] = descs
-        logger.info("Computing descriptions embeddings")
-        embeddings = self.embedder.generate_embeddings(df_relevant, "Full_description")
-        embeddings_np = np.vstack(embeddings)
-        embedding_vac = self.embedder.embed_corpus([vac_desc])
-        embedding_vac_np = np.array(embedding_vac)
-        cos_sims = cosine_similarity(embedding_vac_np, embeddings_np)[0]
-        df_relevant["full_desc_emb_sim"] = cos_sims
-        ranking_features = self.ranking_features_first_stage + ["full_desc_emb_sim"]
+        if self.method == Method.EMBEDDINGS:
+            logger.info("Computing descriptions embeddings")
+            embeddings = self.embedder.generate_embeddings(
+                df_relevant, "Full_description"
+            )
+            embeddings_np = np.vstack(embeddings)
+            embedding_vac = self.embedder.embed_corpus([vac_desc])
+            embedding_vac_np = np.array(embedding_vac)
+            cos_sims = cosine_similarity(embedding_vac_np, embeddings_np)[0]
+            df_relevant["full_desc_sim"] = cos_sims
+        elif self.method == Method.PROMPT:
+            logger.info("Computing scores with prompt")
+            corpus_descs = (
+                df_relevant["Full_description"]
+                .apply(lambda x: "[SEP]".join([vac_desc, x]))
+                .to_list()
+            )
+            sim_scores = process_corpus(
+                corpus=corpus_descs,
+                func=self.match_prompt,
+                num_workers=self.request_num_workers,
+            )
+            df_relevant["full_desc_sim"] = sim_scores
+        else:
+            raise ValueError(
+                f"Method doesn't exist: {self.method}, {self.method == Method.PROMPT}, {Method.PROMPT}"
+            )
+
+        ranking_features = self.ranking_features_first_stage + ["full_desc_sim"]
         df_relevant["sim_score_second"] = (
             np.dot(df_relevant[ranking_features].values, self.second_stage_weights)
             / self.second_stage_weights.sum()

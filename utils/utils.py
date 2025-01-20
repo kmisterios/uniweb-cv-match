@@ -20,6 +20,8 @@ def df2dict(df: pd.DataFrame):
 
 
 def select_color(match_score: int):
+    if match_score == -1:
+        return "grey"
     if match_score >= 70:
         return "green"
     elif 40 < match_score < 70:
@@ -34,14 +36,12 @@ def load_data(path: str):
 
 
 @st.cache_resource
-def load_model(config_path: st, method: str):
+def load_model(config_path: st):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     config_model = config["model"]
-    selector = CvSelector(
-        config=config_model, api_token=os.getenv("OPENAI_TOKEN"), method=method
-    )
-    return selector
+    selector = CvSelector(config=config_model, api_token=os.getenv("OPENAI_TOKEN"))
+    return selector, config
 
 
 def format_intersection(str_vac: str, str_cv) -> str:

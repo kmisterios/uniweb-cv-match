@@ -281,7 +281,14 @@ class CvSelector:
         mask_vac = [
             int(
                 vacancy_dict[feat].lower().strip()
-                not in ["нет данных", "нет информации", "", "none"]
+                not in [
+                    "нет данных",
+                    "нет информации",
+                    "",
+                    "none",
+                    "не указано",
+                    "не указана",
+                ]
             )
             for feat in self.ranking_features
         ]
@@ -295,6 +302,7 @@ class CvSelector:
         if self.method == Method.EMBEDDINGS:
             logger.info("Computing descriptions embeddings")
             for feat in self.feats_match:
+                df_relevant[feat] = df_relevant[feat].fillna("Нет данных")
                 embeddings = self.embedder.generate_embeddings(df_relevant, feat)
                 embeddings_np = np.vstack(embeddings)
                 embedding_vac = self.embedder.embed_corpus([vacancy_prep[feat]])
@@ -326,7 +334,13 @@ class CvSelector:
             np.dot(df_relevant[self.sim_scores_names].values, weights) / weights.sum()
         )
         df_ranked = df_relevant.sort_values("sim_score_second", ascending=False)
-        return df_ranked.head(self.top_n_second_stage)
+        df_ranked = df_ranked.rename(
+            columns={
+                "skills_sim": "Список навыков_sim",
+                "prof_field_full_sim": "Профессиональная область_sim",
+            }
+        )
+        return df_ranked.head(self.top_n_second_stage), vacancy_prep, nan_mask
 
 
 if __name__ == "__main__":

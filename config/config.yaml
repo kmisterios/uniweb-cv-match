@@ -1,3 +1,5 @@
+general:
+  mode: "prod"
 model:
   stage_1:
     text_features:
@@ -7,7 +9,7 @@ model:
       - "Должность_cat_sim"
       - "Должность_subcat_sim"
     weights: [1.0, 1.0, 1.0, 1.0]
-    top_n: 100
+    top_n: 50
   stage_2:
     keys_vacancy:
       - "Должность"
@@ -91,10 +93,10 @@ model:
       - Должность
       - Должность категория
       - Должность подкатегория
-      - Список навыков
       - Профессиональная область
-      - Full_description
       - Знания
+      - Full_description
+      - Список навыков
       - Опыт работы
       - Образование
       - Условия работы
@@ -103,10 +105,10 @@ model:
       - Должность_sim
       - Должность_cat_sim
       - Должность_subcat_sim
-      - skills_sim
       - prof_field_full_sim
-      - Full_description_sim
       - Знания_sim
+      - Full_description_sim
+      - Список навыков_sim
       - Опыт работы_sim
       - Образование_sim
       - Условия работы_sim

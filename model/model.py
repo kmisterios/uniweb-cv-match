@@ -50,6 +50,7 @@ class CvSelector:
         self.request_num_workers = config["stage_2"]["request_num_workers"]
         self.keys_cv = config["stage_2"]["keys_cv"]
         self.feats_match = config["stage_2"]["feats_match"]
+        self.feats_match_prompt = config["stage_2"]["feats_match_prompt"]
         self.ranking_features = config["stage_2"]["ranking_features"]
         self.sim_scores_names = config["stage_2"]["sim_scores_names"]
         self.second_stage_weights = np.array(config["stage_2"]["weights"])
@@ -62,9 +63,8 @@ class CvSelector:
         self.method = method
         if method not in [Method.EMBEDDINGS, Method.PROMPT]:
             self.method = str(Method.EMBEDDINGS)
-        if self.method == Method.PROMPT:
-            self.prompt_matching = config["stage_2"]["prompt_matching"]
-            self.system_prompt_matching = config["stage_2"]["system_prompt_matching"]
+        self.prompt_matching = config["stage_2"]["prompt_matching"]
+        self.system_prompt_matching = config["stage_2"]["system_prompt_matching"]
 
     def __text_features_intersection(self, str_feats_ref: str, str_feats_match: str):
         set1 = set(str_feats_ref.lower().split(", "))
@@ -309,6 +309,22 @@ class CvSelector:
                 embedding_vac_np = np.array(embedding_vac)
                 cos_sims = cosine_similarity(embedding_vac_np, embeddings_np)[0]
                 df_relevant[f"{feat}_sim"] = cos_sims
+            for feat in self.feats_match_prompt:
+                corpus = (
+                    df_relevant[feat]
+                    .apply(
+                        lambda x: "[SEP]".join(
+                            [f"{feat}:\n" + vacancy_prep[feat], f"{feat}:\n" + x]
+                        )
+                    )
+                    .to_list()
+                )
+                sim_scores = process_corpus(
+                    corpus=corpus,
+                    func=self.match_prompt,
+                    num_workers=self.request_num_workers,
+                )
+                df_relevant[f"{feat}_sim"] = sim_scores
         ## currently not working properly
         elif self.method == Method.PROMPT:
             logger.info("Computing scores with prompt")

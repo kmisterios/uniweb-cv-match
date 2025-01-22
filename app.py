@@ -179,7 +179,7 @@ if option is not None:
                                 match_score = 0
                                 flag_cv = True
                             if flag_vac * flag_cv:
-                                match_score = 100
+                                match_score = 0
                             accent_color = select_color(match_score)
                             container_score.markdown(
                                 "<br>" * int((num_rows // 2)), unsafe_allow_html=True

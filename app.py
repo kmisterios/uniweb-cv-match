@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from utils.hardcode_data import candidate_names, map_names
 from utils.utils import *
 
 if "computed" not in st.session_state:
@@ -20,11 +21,6 @@ selector, config = load_model(config_path="./config/config.yaml")
 vacancies = vacancy_df["Должность"].to_list()
 
 features = deepcopy(config["model"]["stage_2"]["ranking_features"])
-map_names = {
-    "Список навыков": "Навыки",
-    "Профессиональная область": "Компетенции",
-    "Full_description": "Полное описание",
-}
 info_dict = {"Компонента": [], "Вес": []}
 for feature, value in zip(features, config["model"]["stage_2"]["weights"]):
     info_dict["Компонента"].append(
@@ -99,6 +95,7 @@ if option is not None:
                 if "(" in key and ")" not in key:
                     key_ += ")"
                 key_ += f" ({round(data_cv[key]['sim_score_second'] * 100)}% match)"
+                key_ = np.random.choice(candidate_names) + f" - {key_}"
                 with st.expander(key_):
                     match_score_first = round(data_cv[key]["sim_score_first"] * 100)
                     accent_color = select_color(match_score_first)

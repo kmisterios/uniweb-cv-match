@@ -175,6 +175,8 @@ if option is not None:
                                 "none",
                                 "не указано",
                                 "не указана",
+                                "не указан",
+                                "не задан",
                             ]:
                                 match_score = 0
                                 flag_cv = True

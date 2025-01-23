@@ -121,7 +121,7 @@ class CvSelector:
 
     def find_info(self, info: str):
         client = OpenAI(api_key=os.getenv("OPENAI_TOKEN"))
-        description, mode, query, query_desc = info.split("[SEP]")
+        description, mode, query, query_desc, delete_data = info.split("[SEP]")
         if mode == ModeInfo.VACANCY:
             question = self.question_vac.replace("[query]", query)
         else:
@@ -132,6 +132,8 @@ class CvSelector:
         system_prompt = self.system_prompt_info.replace("[query]", query)
         if query_desc is not None and query_desc != "None":
             system_prompt += f"\n{query_desc}"
+        if delete_data is not None and delete_data != "None":
+            prompt = f"Данные для удаления:\n{delete_data}\n\n" + prompt
 
         completion = client.chat.completions.create(
             model=self.model_name,
@@ -211,6 +213,7 @@ class CvSelector:
                     ModeInfo.VACANCY,
                     cat,
                     self.category_desc.get(cat, "None"),
+                    vacancy["Список навыков"] if cat == "знания" else "None",
                 ]
             )
             info_extracted = self.find_info(info=info)
@@ -246,6 +249,10 @@ class CvSelector:
             }
         )
         df_relevant["Описание"] = df_relevant["Описание"].fillna("Нет данных")
+        df_relevant["Список навыков"] = df_relevant["Список навыков"].fillna(
+            "Нет данных"
+        )
+        # df_relevant = df_relevant.fillna("Нет данных")
         new_cats = {}
         for cat in self.cats_find_cv:
             corpus = [
@@ -255,6 +262,9 @@ class CvSelector:
                         "cv",
                         cat,
                         self.category_desc.get(cat, "None"),
+                        df_relevant.iloc[i]["Список навыков"]
+                        if cat == "знания"
+                        else "None",
                     ]
                 )
                 for i in range(df_relevant.shape[0])
@@ -288,6 +298,8 @@ class CvSelector:
                     "none",
                     "не указано",
                     "не указана",
+                    "не указан",
+                    "не задан",
                 ]
             )
             for feat in self.ranking_features

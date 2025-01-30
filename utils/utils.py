@@ -65,4 +65,4 @@ def format_intersection(str_vac: str, str_cv) -> str:
 
 class Mode(StrEnum):
     MASS = "Массовый"
-    PROF = "Индивидуальный"
+    PROF = "Профессиональный"

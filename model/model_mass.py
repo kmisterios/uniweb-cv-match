@@ -4,6 +4,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Dict, List
 
+import nltk
 import numpy as np
 import pandas as pd
 import simplemma
@@ -20,6 +21,7 @@ from utils.enums import Method, ModeInfo
 from utils.request_api import OpenAIEmbedder, process_corpus
 
 load_dotenv()
+nltk.download("punkt_tab")
 
 
 class MassCvSelector(CvSelector):

@@ -15,8 +15,20 @@ if "computed" not in st.session_state:
 
 st.title("Подбор кандидатов 💼")
 
-vacancy_df = load_data(path="./data/vacancies.csv")
-selector, config = load_model(config_path="./config/config.yaml")
+mode = st.select_slider(
+    "Выберете тип подбора",
+    options=[
+        str(Mode.MASS),
+        str(Mode.PROF),
+    ],
+)
+
+if mode == str(Mode.PROF):
+    vacancy_df = load_data(path="./data/vacancies.csv")
+    selector, config = load_model(config_path="./config/config.yaml")
+else:
+    vacancy_df = load_data(path="./data_mass/vacancies.csv")
+    selector, config = load_model(config_path="./config/config_mass.yaml")
 
 vacancies = vacancy_df["Должность"].to_list()
 
@@ -48,17 +60,27 @@ if option is not None:
     with col1:
         col1_container = st.container(border=True, height=100)
         col1_container.caption("Профессиональная область")
-        col1_container.markdown(f"**{vacancy['prof_field_full']}**")
+        if mode == str(Mode.PROF):
+            col1_container.markdown(f"**{vacancy['prof_field_full']}**")
+        else:
+            col1_container.markdown(f"**{vacancy['Компетенции']}**")
     with col2:
         col2_container = st.container(border=True, height=100)
-        text = vacancy["Список навыков"]
+        if mode == str(Mode.PROF):
+            text = vacancy["Список навыков"]
+        else:
+            text = vacancy["Навыки"]
         col2_container.caption("Список навыков")
         col2_container.markdown(f"**{text}**")
     container = st.container(border=True)
     container.caption("Описание")
     container.write(vacancy["Описание"])
     if st.button("Подобрать", type="primary"):
-        df_cv = load_data(f"./data/{option}.csv")
+        if mode == str(Mode.PROF):
+            df_cv = load_data(f"./data/{option}.csv")
+        else:
+            df_cv = load_data(f"./data_mass/{option}.csv")
+            df_cv = df_cv.rename(columns={"address": "Адрес"})
         with st.status("Подбор кандидатов..."):
             if (
                 not Path("./tmp_cvs.csv").exists()
@@ -87,16 +109,25 @@ if option is not None:
             st.session_state["computed"] = True
             st.write(f"Выбрано {df_ranked_2nd.shape[0]} лучших кандидатов.")
         if st.session_state["computed"]:
-            nan_mask = np.delete(nan_mask, [1, 2, 5])
+            if mode == str(Mode.PROF):
+                nan_mask = np.delete(nan_mask, [1, 2, 5])
+            else:
+                nan_mask = np.delete(nan_mask, [3])
             st.subheader("Кандидаты", divider="blue")
             for key in data_cv:
                 col1_results, col2_cv = st.columns(2)
-                key_ = data_cv[key]["Должность"]
-                if "(" in key and ")" not in key:
-                    key_ += ")"
+                if mode == str(Mode.PROF):
+                    key_ = data_cv[key]["Должность"]
+                    if "(" in key and ")" not in key:
+                        key_ += ")"
+                else:
+                    key_ = ""
                 key_ += f" ({round(data_cv[key]['sim_score_second'] * 100)}% match)"
                 key_ = np.random.choice(candidate_names) + f" - {key_}"
                 with st.expander(key_):
+                    if mode == str(Mode.MASS):
+                        url = f"https://www.avito.ru{data_cv[key]['link']}"
+                        st.write(f"[Ссылка на Avito]({url})")
                     match_score_first = round(data_cv[key]["sim_score_first"] * 100)
                     accent_color = select_color(match_score_first)
                     st.markdown(
@@ -108,29 +139,33 @@ if option is not None:
                     st.markdown(
                         f"Вторая фаза: :{accent_color}[{match_score_second}% match]"
                     )
-
-                    match_score_full_desc = round(
-                        data_cv[key]["Full_description_sim"] * 100
-                    )
-                    accent_color = select_color(match_score_second)
-                    st.markdown(
-                        f"Похожесть по полному описанию: :{accent_color}[{match_score_full_desc}% match]"
-                    )
+                    if mode == str(Mode.PROF):
+                        match_score_full_desc = round(
+                            data_cv[key]["Full_description_sim"] * 100
+                        )
+                        accent_color = select_color(match_score_second)
+                        st.markdown(
+                            f"Похожесть по полному описанию: :{accent_color}[{match_score_full_desc}% match]"
+                        )
 
                     ranking_features = deepcopy(
                         config["model"]["stage_2"]["ranking_features"]
                     )
-                    ranking_features.remove("Должность категория")
-                    ranking_features.remove("Должность подкатегория")
-                    ranking_features.remove("Full_description")
-                    job_labels = [
-                        "Должность_sim",
-                        "Должность_cat_sim",
-                        "Должность_subcat_sim",
-                    ]
-                    data_cv[key]["Должность_sim"] = (
-                        sum([data_cv[key][job_label] for job_label in job_labels]) / 3
-                    )
+                    if mode == str(Mode.PROF):
+                        ranking_features.remove("Должность категория")
+                        ranking_features.remove("Должность подкатегория")
+                        ranking_features.remove("Full_description")
+                        job_labels = [
+                            "Должность_sim",
+                            "Должность_cat_sim",
+                            "Должность_subcat_sim",
+                        ]
+                        data_cv[key]["Должность_sim"] = (
+                            sum([data_cv[key][job_label] for job_label in job_labels])
+                            / 3
+                        )
+                    else:
+                        ranking_features.remove("date")
                     for i, feature in enumerate(ranking_features):
                         col_results_1, col_results_2, col_results_3 = st.columns(
                             [2, 1, 2], gap="small", vertical_alignment="center"
@@ -150,10 +185,16 @@ if option is not None:
                             if feature in map_names:
                                 feature_print = map_names[feature]
                             container_cv.caption(feature_print)
-                            formated_text = format_intersection(
-                                vacancy_prep[feature],
-                                data_cv[key][feature],
-                            )
+                            if feature == "Адрес":
+                                formated_text = format_intersection(
+                                    vacancy_prep[feature],
+                                    data_cv[key]["address_full"],
+                                )
+                            else:
+                                formated_text = format_intersection(
+                                    vacancy_prep[feature],
+                                    data_cv[key][feature],
+                                )
                             container_cv.markdown(formated_text.capitalize())
 
                         with col_results_2:
@@ -186,9 +227,14 @@ if option is not None:
                             container_score.markdown(
                                 "<br>" * int((num_rows // 2)), unsafe_allow_html=True
                             )
-                            container_score.markdown(
-                                f":{accent_color}[{match_score}%\nmatch]"
-                            )
+                            if feature == "Адрес":
+                                container_score.markdown(
+                                    f":{accent_color}[{match_score}%\n близость]"
+                                )
+                            else:
+                                container_score.markdown(
+                                    f":{accent_color}[{match_score}%\nmatch]"
+                                )
 
                         with col_results_3:
                             if i == 0:
@@ -200,13 +246,23 @@ if option is not None:
                             if feature in map_names:
                                 feature_print = map_names[feature]
                             container_vac.caption(feature_print)
-                            formated_text = format_intersection(
-                                data_cv[key][feature], vacancy_prep[feature]
-                            )
+                            if feature == "Адрес":
+                                formated_text = format_intersection(
+                                    data_cv[key]["address_full"], vacancy_prep[feature]
+                                )
+                            else:
+                                formated_text = format_intersection(
+                                    data_cv[key][feature], vacancy_prep[feature]
+                                )
                             container_vac.markdown(formated_text.capitalize())
                         if feature == "Должность":
                             st.info(
                                 "Указано среднее значение 3 скоров для компонент, связанных с Должностью.",
+                                icon="ℹ️",
+                            )
+                        if feature == "Адрес":
+                            st.info(
+                                "100% близость означает, что кандидат находится ближе всех других кандидатов",
                                 icon="ℹ️",
                             )
                         if i < len(ranking_features) - 1:

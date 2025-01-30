@@ -1,5 +1,5 @@
 general:
-  mode: "debug"
+  mode: "prod"
 model:
   stage_1:
     days_filter_threshold: 90

@@ -183,7 +183,7 @@ class CvSelector:
         df_ranked = df_relevant.sort_values("sim_score_first", ascending=False)
         return df_ranked.head(self.top_n_first_stage)
 
-    def __postprocess_extracted_info(self, info: str, cat: str):
+    def postprocess_extracted_info(self, info: str, cat: str):
         try:
             info_dict = json.loads(info)
             if type(info_dict[cat]) == list:
@@ -217,7 +217,7 @@ class CvSelector:
                 ]
             )
             info_extracted = self.find_info(info=info)
-            info_dict = self.__postprocess_extracted_info(info=info_extracted, cat=cat)
+            info_dict = self.postprocess_extracted_info(info=info_extracted, cat=cat)
             info_dict[cat.capitalize()] = info_dict.pop(cat)
             vacancy.update(info_dict)
         vacancy["Full_description"] = self.__get_desc(
@@ -273,7 +273,7 @@ class CvSelector:
             found_values = []
             for i in range(df_relevant.shape[0]):
                 info_extracted = new_cats[cat][i]
-                info_dict = self.__postprocess_extracted_info(info_extracted, cat=cat)
+                info_dict = self.postprocess_extracted_info(info_extracted, cat=cat)
                 found_values.append(info_dict[cat])
             df_relevant[cat.capitalize()] = found_values
 
@@ -287,9 +287,11 @@ class CvSelector:
         df_relevant["Full_description"] = descs
         return df_relevant
 
-    def __vacancy_mask(self, vacancy_dict: Dict):
+    def vacancy_mask(self, vacancy_dict: Dict):
         mask_vac = [
-            int(
+            True
+            if feat not in vacancy_dict
+            else int(
                 vacancy_dict[feat].lower().strip()
                 not in [
                     "нет данных",
@@ -356,7 +358,7 @@ class CvSelector:
                 f"Method doesn't exist: {self.method}, {self.method == Method.PROMPT}, {Method.PROMPT}"
             )
 
-        nan_mask = self.__vacancy_mask(vacancy_dict=vacancy_prep)
+        nan_mask = self.vacancy_mask(vacancy_dict=vacancy_prep)
         weights = self.second_stage_weights * nan_mask
         df_relevant["sim_score_second"] = (
             np.dot(df_relevant[self.sim_scores_names].values, weights) / weights.sum()
@@ -402,7 +404,7 @@ if __name__ == "__main__":
     logger.info("Finished successfully")
 
     logger.info("2nd stage ranking..")
-    df_ranked_2nd = selector.rank_second_stage(
+    df_ranked_2nd, vacancy_prep, nan_mask = selector.rank_second_stage(
         vacancy=vacancy, df_relevant=df_ranked_1st.copy()
     )
 

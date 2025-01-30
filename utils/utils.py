@@ -1,12 +1,13 @@
 import os
 from collections import OrderedDict
+from enum import StrEnum
 
 import pandas as pd
 import streamlit as st
 import yaml
 from dotenv import load_dotenv
 
-from model.model import CvSelector
+from model import CvSelector, MassCvSelector
 
 load_dotenv()
 
@@ -30,21 +31,28 @@ def select_color(match_score: int):
         return "red"
 
 
-@st.cache_data
+# @st.cache_data
 def load_data(path: str):
     return pd.read_csv(path)
 
 
-@st.cache_resource
+# @st.cache_resource
 def load_model(config_path: st):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     config_model = config["model"]
-    selector = CvSelector(config=config_model, api_token=os.getenv("OPENAI_TOKEN"))
+    if "mass" in config_path:
+        selector = MassCvSelector(
+            config=config_model, api_token=os.getenv("OPENAI_TOKEN")
+        )
+    else:
+        selector = CvSelector(config=config_model, api_token=os.getenv("OPENAI_TOKEN"))
     return selector, config
 
 
 def format_intersection(str_vac: str, str_cv) -> str:
+    str_vac = str_vac.replace("\n\n", ", ").replace("\n", ", ")
+    str_cv = str_cv.replace("\n\n", ", ").replace("\n", ", ")
     split_cv = str_cv.lower().split(", ")
     set1 = set(str_vac.lower().split(", "))
     set2 = set(split_cv)
@@ -52,4 +60,9 @@ def format_intersection(str_vac: str, str_cv) -> str:
     for i, word in enumerate(split_cv):
         if word in intersection:
             split_cv[i] = f"**{word}**"
-    return ", ".join(split_cv)
+    return ", ".join(split_cv).replace(":**,", ":**").replace(":,", ":")
+
+
+class Mode(StrEnum):
+    MASS = "Массовый"
+    PROF = "Индивидуальный"

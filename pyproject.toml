@@ -20,6 +20,9 @@ tenacity = "^9.0.0"
 toml = "^0.10.2"
 tqdm = "^4.67.1"
 watchdog = "^6.0.0"
+nltk = "^3.9.1"
+simplemma = "^1.1.2"
+rank-bm25 = "^0.2.2"
 
 
 [build-system]
